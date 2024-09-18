@@ -293,7 +293,7 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
                 Log.i("FFmpeg", "Streaming completed successfully");
                 channel.invokeMethod("onComplete", "Streaming completed successfully");
             } else {
-                // logError("Connection to Icecast failed");
+                logError("Connection to Icecast failed");
                 Log.e("FFmpeg", "Error in streaming with return code: " + returnCode);
             }
         }
