@@ -119,7 +119,7 @@ class IcecastStreamer {
     return await IcecastStreamerPlatform.instance.stopStream();
   }
 
-  Future<List<InputDevice>> getInputDevices() async {
+  static Future<List<InputDevice>> getInputDevices() async {
     var responce = await IcecastStreamerPlatform.instance.getInputDevices();
 
     return responce.map(InputDevice.fromMap).toList();
