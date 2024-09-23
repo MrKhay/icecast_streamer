@@ -18,8 +18,8 @@ import androidx.annotation.RequiresApi;
 import com.arthenica.mobileffmpeg.FFmpeg;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,9 +37,9 @@ import io.flutter.plugin.common.MethodChannel.Result;
  */
 public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, ActivityAware {
     private Context context;
+    private final String TAG = "FFmpeg";
     private Activity activity;
     private MethodChannel channel;
-
     private String INPUT_DEVICE_ID;  // Sample rate in Hz
     private int SAMPLE_RATE = 44100;  // Sample rate in Hz
     private java.lang.Double VOLUME = 0.7;  // PCM-16 amplitude
@@ -53,15 +53,19 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
 
     private FileOutputStream fos1;
     private FileOutputStream fos2;
+    private FileOutputStream recordingFOS;
     private Thread streamingThread;
     private Thread recorderThread;
 
     private String pipePath1;
     private String pipePath2;
+    private String recordingChunkPath;
 
     private AudioRecord recorder;
     private boolean isStreaming = false;
     private boolean isRecording = false;
+    private boolean isRecordingAudio = false; // PCM chunks are been recorded
+    private boolean isInitialized = false;
     private boolean isStreamTwoActive = false;
 
 
@@ -72,95 +76,105 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
         context = flutterPluginBinding.getApplicationContext();
     }
 
+
+    @RequiresApi(api = Build.VERSION_CODES.P)
+    @Override
+    public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
+        switch (call.method) {
+            case "init":
+                startRecording();
+                result.success(null);
+                break;
+            case "startStreaming":
+                INPUT_DEVICE_ID = call.argument("inputDeviceId");
+                BIT_RATE = call.argument("bitrate");
+                VOLUME = call.argument("volume");
+                NUM_CHANNELS = call.argument("numChannels");
+                SAMPLE_RATE = call.argument("sampleRate");
+                ICECAST_USERNAME = call.argument("userName");
+                ICECAST_MOUNT = call.argument("mount");
+                ICECAST_PASSWORD = call.argument("password");
+                ICECAST_PORT = call.argument("port");
+                ICECAST_SERVER_ADDRESS = call.argument("serverAddress");
+                startRecording(); // start recording
+                startStreaming(); // start streaming
+                result.success(null);
+                break;
+            case "stopStreaming":
+                String errorMsg = stopStreaming(); // start streaming
+                result.success(errorMsg);
+                break;
+            case "dispose":
+                stopRecording();
+                closeAndDeletePipe(); // close pipes
+                break;
+            case "getInputDevices":
+                List<Map<String, String>> devices = DeviceUtils.listInputDevicesAsMap(context);
+                result.success(devices);
+                break;
+            case "updateVolume":
+                VOLUME = call.argument("volume");
+                result.success(null);
+                break;
+
+            case "startRecording":
+                startPCMRecording();
+                isRecordingAudio = true;
+                result.success(null);
+                break;
+            case "stopRecording":
+                String recordingPath = stopAndSavePCMRecording();
+                isRecordingAudio = false;
+                result.success(recordingPath);
+                break;
+            default:
+                result.notImplemented();
+                break;
+        }
+    }
+
+    private class ExecuteCallback implements com.arthenica.mobileffmpeg.ExecuteCallback {
+        @Override
+        public void apply(long executionId, int returnCode) {
+            // Handle completion
+            if (returnCode == 0) {
+                Log.i(TAG, "Streaming completed successfully");
+                channel.invokeMethod("onComplete", "Streaming completed successfully");
+            } else {
+                logError("Connection to Icecast failed");
+                Log.e(TAG, "Error in streaming with return code: " + returnCode);
+            }
+        }
+
+
+    }
+
+    private void init() {
+
+        try {
+            // Get the app's private storage directory and create a named pipe
+            pipePath1 = new File(getFilesDir(context), "audio_pipe_one").getAbsolutePath();
+            pipePath2 = new File(getFilesDir(context), "audio_pipe_two").getAbsolutePath();
+            recordingChunkPath = new File(getFilesDir(context), "recording_chunk.pcm").getAbsolutePath();
+            Utility.createNamedPipe(pipePath1);
+            Utility.createNamedPipe(pipePath2);
+
+
+//            fos2 = new FileOutputStream(pipePath2);
+
+            isInitialized = true;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to init pipes", e);
+        }
+
+    }
+
+
     @RequiresApi(api = Build.VERSION_CODES.P)
     @SuppressLint("MissingPermission")
     private void startStreaming() {
-        Log.i("FFmpeg", "Called startStreaming ");
         try {
-
-            // Get the app's private storage directory and create a named pipe
-            File storageDir = new File(getFilesDir(context));
-            pipePath1 = new File(storageDir, "audio_pipe_one").getAbsolutePath();
-            pipePath2 = new File(storageDir, "audio_pipe_tow").getAbsolutePath();
-            Utility.CreateNamedPipe(pipePath1);
-            Utility.CreateNamedPipe(pipePath2);
-
-
-            // Initialize Pipe 2
-            new Thread(() -> {
-                try {
-                    fos2 = new FileOutputStream(pipePath2);
-                } catch (FileNotFoundException e) {
-                    Log.e("FFmpeg", "Failed to open output stream 2", e);
-                }
-            }).start();
-
-            // Initialize and start Recorder
-            recorderThread = new Thread(() -> {
-                int BUFFER_SIZE = AudioRecord.getMinBufferSize(
-                        SAMPLE_RATE, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT);
-
-                try {
-                    AudioDeviceInfo deviceInfo = DeviceUtils.deviceInfoFromId(context, INPUT_DEVICE_ID);
-                    recorder = new AudioRecord.Builder()
-                            .setAudioSource(MediaRecorder.AudioSource.MIC)
-                            .setAudioFormat(new AudioFormat.Builder()
-                                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                                    .setSampleRate(SAMPLE_RATE)
-                                    .setChannelMask(AudioFormat.CHANNEL_IN_STEREO)
-                                    .build())
-                            .setBufferSizeInBytes(BUFFER_SIZE)
-                            .build();
-
-                    if (deviceInfo != null) {
-                        recorder.setPreferredDevice(deviceInfo);
-                    }
-
-
-                    if (recorder.getState() != AudioRecord.STATE_INITIALIZED) {
-                        logError("Audio Record can't initialize!");
-                        Log.e("FFmpeg", "Audio Record can't initialize!");
-                        return;
-                    }
-
-                    recorder.startRecording();
-                    // Initialize Pipe 1
-                    fos1 = new FileOutputStream(pipePath1);
-                    byte[] buffer = new byte[BUFFER_SIZE];
-                    isRecording = true;
-                    while (isRecording) {
-                        int read = recorder.read(buffer, 0, buffer.length);
-                        if (read > 0) {
-
-                            // Scale the volume
-                            byte[] modifiedBuffer = Loudness.ScaleVolume(buffer, VOLUME); // 'volume' is a float between 0.0 and 1.0
-
-                            fos1.write(modifiedBuffer, 0, read);
-
-                            // Calculate RMS
-                            double rmsValue = Loudness.calculateRMS(modifiedBuffer);
-
-                            // Calculate dB value for VU meter
-                            double dBValue = Loudness.calculateVuMeter(rmsValue);
-
-                            activity.runOnUiThread(() -> updateLoudness(dBValue));
-
-
-                        }
-                    }
-                } catch (Exception e) {
-                    Log.e("FFmpeg", "Start recorder", e);
-                }
-            });
-
-
-            recorderThread.start();
-            try {
-                Thread.sleep(1000); // sleep for 1sec
-            } catch (Exception e) {
-            }
-
-
             // Start streaming thread
             streamingThread = new Thread(() -> {
                 String[] command = {
@@ -181,44 +195,149 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
                     FFmpeg.executeAsync(command, new ExecuteCallback());
 
                 } catch (Exception e) {
-                    Log.i("FFmpeg", "Executing FFmpeg command");
+                    Log.i(TAG, "Executing FFmpeg command");
                 }
             });
 
 
             isStreaming = true;
-            // Start streaming thread
-            streamingThread.start();
+            streamingThread.start(); // Start streaming thread
 
         } catch (Exception e) {
-            Log.e("FFmpeg", "Streaming failed" + e.getMessage());
+            Log.e(TAG, "Streaming failed" + e.getMessage());
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    @RequiresApi(api = Build.VERSION_CODES.P)
+    private void startRecording() {
+
+        // initialize
+        if (!isInitialized) {
+            init();
+        }
+
+
+        // stop recording if already recording
+        if (recorder != null) {
+            stopRecording();
+        }
+
+        // Initialize and start Recorder
+        recorderThread = new Thread(() -> {
+            int BUFFER_SIZE = AudioRecord.getMinBufferSize(
+                    SAMPLE_RATE, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT);
+
+            try {
+                AudioDeviceInfo deviceInfo = DeviceUtils.deviceInfoFromId(context, INPUT_DEVICE_ID);
+                recorder = new AudioRecord.Builder()
+                        .setAudioSource(MediaRecorder.AudioSource.MIC)
+                        .setAudioFormat(new AudioFormat.Builder()
+                                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                .setSampleRate(SAMPLE_RATE)
+                                .setChannelMask(AudioFormat.CHANNEL_IN_STEREO)
+                                .build())
+                        .setBufferSizeInBytes(BUFFER_SIZE)
+                        .build();
+
+
+                if (deviceInfo != null) {
+                    recorder.setPreferredDevice(deviceInfo);
+                }
+
+
+                if (recorder.getState() != AudioRecord.STATE_INITIALIZED) {
+                    activity.runOnUiThread(() -> logError("Audio Record can't be initialized!"));
+                    Log.e(TAG, "Audio Record can't initialize!");
+                    return;
+                }
+
+                recorder.startRecording();
+                // Initialize Pipe 1
+                if (isStreaming) {
+                    fos1 = new FileOutputStream(pipePath1, true);
+                }
+
+                byte[] buffer = new byte[BUFFER_SIZE];
+                while (isRecording) {
+                    int read = recorder.read(buffer, 0, buffer.length);
+                    if (read > 0) {
+
+                        // Scale the volume
+                        byte[] modifiedBuffer = Loudness.ScaleVolume(buffer, VOLUME); // 'volume' is a float between 0.0 and 1.0
+
+                        if (isStreaming) {
+                            fos1.write(modifiedBuffer, 0, read);
+                        }
+
+                        if (isRecordingAudio) {
+                            // Write byte array to the file
+                            try (FileOutputStream fos = new FileOutputStream(recordingChunkPath)) {
+                                fos.write(modifiedBuffer);
+                            } catch (IOException e) {
+                                Log.e(TAG, e.getMessage());
+                            }
+                        }
+
+                        // Calculate RMS
+                        double rmsValue = Loudness.calculateRMS(modifiedBuffer);
+
+                        // Calculate dB value for VU meter
+                        double dBValue = Loudness.calculateVuMeter(rmsValue);
+
+                        activity.runOnUiThread(() -> updateLoudness(dBValue));
+
+
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Start recorder", e);
+            }
+        });
+
+        isRecording = true;
+        recorderThread.start();
+    }
+
+    private void stopRecording() {
+        isRecording = false;
+
+        if (recorder != null) {
+            recorder.stop();
+            recorder.release();
+            recorder = null;
+        }
+
+        if (recorderThread != null) {
+            recorderThread.interrupt();
+            recorderThread = null;
+
+        }
+
+        isRecording = false;
     }
 
 
     private String stopStreaming() {
         try {
-            isStreaming = false;
-            isRecording = false;
 
-            if (recorder != null) {
-                recorder.stop();
-                recorder.release();
-                recorder = null;
-            }
-
-            if (recorderThread != null) {
-                recorderThread.interrupt();
-                recorderThread = null;
-
-            }
 
             if (streamingThread != null) {
                 streamingThread.interrupt();
                 streamingThread = null;
-
             }
+
+            isStreaming = false;
+
             FFmpeg.cancel();
+            return null;
+        } catch (Exception e) {
+            return "Stopping stream failed: " + e.getMessage();
+        }
+    }
+
+    private void closeAndDeletePipe() {
+        try {
             if (fos1 != null) {
                 fos1.close();
                 fos1 = null;
@@ -227,12 +346,55 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
                 fos2.close();
                 fos2 = null;
             }
+
+            if (recordingFOS != null) {
+                recordingFOS.close();
+                recordingFOS = null;
+            }
             Utility.DeletePipe(pipePath1);
             Utility.DeletePipe(pipePath2);
-            return null;
-        } catch (Exception e) {
-            return "Stopping stream failed: " + e.getMessage();
+            pipePath1 = null;
+            pipePath2 = null;
+            recordingChunkPath = null;
+            isRecording = false;
+            isInitialized = false;
+        } catch (IOException e) {
+            Log.e(TAG, "closeAndDeletePipe: " + e.getMessage());
         }
+    }
+
+    private void startPCMRecording() {
+        if (!isInitialized) {
+            init();
+        }
+        Utility.createFile(recordingChunkPath);
+    }
+
+    private String stopAndSavePCMRecording() {
+        if (!isRecording) return null;
+
+
+        String recordedAudioPath = Utility.generateFileName(getFilesDir(context), ".mp3");
+        Utility.createFile(recordedAudioPath);
+
+        String[] command = {
+                "-f", "s16le",           // PCM format (16-bit little-endian)
+                "-ar", String.valueOf(SAMPLE_RATE),          // Sample rate (44.1kHz)
+                "-ac", String.valueOf(NUM_CHANNELS),              // Number of channels (2 for stereo)
+                "-i", recordingChunkPath,       // Input PCM file
+                "-acodec", "libmp3lame", // MP3 codec
+                "-b:a", String.valueOf(BIT_RATE),          // Bitrate (128 kbps)
+                recordedAudioPath             // Output MP3 file
+        };
+
+        int returnCode = FFmpeg.execute(command);
+
+        // delete chunk
+        new File(recordingChunkPath).delete();
+
+        return recordedAudioPath;
+
+
     }
 
     void logError(String msg) {
@@ -249,57 +411,6 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
         channel.invokeMethod("onLoudnessChange", info);
     }
 
-
-    @RequiresApi(api = Build.VERSION_CODES.P)
-    @Override
-    public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
-        switch (call.method) {
-            case "startStreaming":
-                BIT_RATE = call.argument("bitrate");
-                VOLUME = call.argument("volume");
-                NUM_CHANNELS = call.argument("numChannels");
-                SAMPLE_RATE = call.argument("sampleRate");
-                ICECAST_USERNAME = call.argument("userName");
-                ICECAST_MOUNT = call.argument("mount");
-                ICECAST_PASSWORD = call.argument("password");
-                ICECAST_PORT = call.argument("port");
-                ICECAST_SERVER_ADDRESS = call.argument("serverAddress");
-                startStreaming();
-                result.success(null);
-                break;
-            case "stopStreaming":
-                String errorMsg = stopStreaming();
-                result.success(errorMsg);
-                break;
-            case "getInputDevices":
-                List<Map<String, String>> devices = DeviceUtils.listInputDevicesAsMap(context);
-                result.success(devices);
-                break;
-            case "updateVolume":
-                VOLUME = call.argument("volume");
-                result.success(null);
-                break;
-            default:
-                result.notImplemented();
-                break;
-        }
-    }
-
-    private class ExecuteCallback implements com.arthenica.mobileffmpeg.ExecuteCallback {
-        @Override
-        public void apply(long executionId, int returnCode) {
-            // Handle completion
-            if (returnCode == 0) {
-                Log.i("FFmpeg", "Streaming completed successfully");
-                channel.invokeMethod("onComplete", "Streaming completed successfully");
-            } else {
-                logError("Connection to Icecast failed");
-                Log.e("FFmpeg", "Error in streaming with return code: " + returnCode);
-            }
-        }
-
-
-    }
 
     @Override
     public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
