@@ -23,6 +23,10 @@ abstract class IcecastStreamerPlatform extends PlatformInterface {
     _instance = instance;
   }
 
+  Future<void> init() {
+    throw UnimplementedError('platformVersion() has not been implemented.');
+  }
+
   Future<void> startStream({
     String? inputDeviceId,
     required int bitrate,
@@ -39,6 +43,18 @@ abstract class IcecastStreamerPlatform extends PlatformInterface {
   }
 
   Future<String?> stopStream() {
+    throw UnimplementedError('platformVersion() has not been implemented.');
+  }
+
+  Future<void> dispose() {
+    throw UnimplementedError('platformVersion() has not been implemented.');
+  }
+
+  Future<void> startRecording() {
+    throw UnimplementedError('platformVersion() has not been implemented.');
+  }
+
+  Future<String?> stopRecording() {
     throw UnimplementedError('platformVersion() has not been implemented.');
   }
 

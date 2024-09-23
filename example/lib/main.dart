@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-
 import 'package:icecast_streamer/icecast_streamer.dart';
-import 'package:icecast_streamer_example/key.dart';
+
+import 'key.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,8 +20,9 @@ class _MyAppState extends State<MyApp> {
   final int sampleRate = 44100;
   final int numChannels = 2;
   bool isStreaming = false;
+  bool isRecording = false;
   double loudness = -50;
-  double volume = 0.0;
+  double volume = 1.0;
 
   @override
   void initState() {
@@ -37,18 +38,21 @@ class _MyAppState extends State<MyApp> {
       sampleRate: sampleRate,
       numChannels: numChannels,
       onLoudnessChange: (loudness) {
-        print("Loudness: $loudness");
+        // debugPrint("Loudness: $loudness");
         setState(() {
           this.loudness = loudness;
         });
       },
       onError: (error) {
-        print("Streaming Error: $error");
+        debugPrint("Streaming Error: $error");
       },
       onComplete: () {
         print("Streaming Completed 🟢");
       },
     );
+
+    _icecastStreamerPlugin.init();
+
     super.initState();
   }
 
@@ -82,24 +86,35 @@ class _MyAppState extends State<MyApp> {
                     });
                   }
                 },
-                child: Text(isStreaming
-                    ? 'Stop streaming ($loudness)'
-                    : 'Start streaming'),
+                child: Text(
+                  isStreaming
+                      ? 'Stop streaming ($loudness)'
+                      : 'Start streaming ($loudness)',
+                ),
               ),
               const SizedBox(height: 30),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    onPressed: () async {
-                      var responce =
-                          await _icecastStreamerPlugin.getInputDevices();
-                      print(responce);
-                    },
-                    icon: const Icon(Icons.plus_one),
-                  ),
-                ],
-              )
+              FilledButton.tonal(
+                onPressed: () async {
+                  if (!isRecording) {
+                    await _icecastStreamerPlugin.startRecording();
+
+                    setState(() {
+                      isRecording = true;
+                    });
+                  } else {
+                    var responce = await _icecastStreamerPlugin.stopRecording();
+                    debugPrint("Recoding path: $responce");
+
+                    setState(() {
+                      isRecording = false;
+                    });
+                  }
+                },
+                child: Text(
+                  isRecording ? 'Stop recording' : 'Start recording',
+                ),
+              ),
+              const SizedBox(height: 30),
             ],
           ),
         ),

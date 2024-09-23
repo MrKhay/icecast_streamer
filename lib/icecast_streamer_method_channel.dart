@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-
 import 'icecast_streamer_platform_interface.dart';
 
 /// An implementation of [IcecastStreamerPlatform] that uses method channels.
@@ -8,6 +7,12 @@ class MethodChannelIcecastStreamer extends IcecastStreamerPlatform {
   /// The method channel used to interact with the native platform.
   @visibleForTesting
   final methodChannel = const MethodChannel('icecast_streamer');
+
+  @override
+  Future<void> init() async {
+    await methodChannel.invokeMethod<String?>('init');
+    return;
+  }
 
   @override
   Future<void> startStream({
@@ -74,5 +79,24 @@ class MethodChannelIcecastStreamer extends IcecastStreamerPlatform {
     await methodChannel
         .invokeMethod<String?>('updateVolume', {"volume": value});
     return;
+  }
+
+  @override
+  Future<void> dispose() async {
+    await methodChannel.invokeMethod<String?>('dispose');
+    return;
+  }
+
+  @override
+  Future<void> startRecording() async {
+    await methodChannel.invokeMethod<String?>('startRecording');
+    return;
+  }
+
+  @override
+  Future<String?> stopRecording() async {
+    var recordingPath =
+        await methodChannel.invokeMethod<String?>('stopRecording');
+    return recordingPath;
   }
 }

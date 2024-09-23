@@ -1,6 +1,5 @@
 import 'package:flutter/services.dart';
 import 'package:icecast_streamer/model/input_device.dart';
-
 import 'icecast_streamer_platform_interface.dart';
 
 class IcecastStreamer {
@@ -97,6 +96,12 @@ class IcecastStreamer {
 
   /// Starts new Stream
   ///
+  Future<void> init() async {
+    return IcecastStreamerPlatform.instance.init();
+  }
+
+  /// Starts new Stream
+  ///
   Future<void> startStream() async {
     await IcecastStreamerPlatform.instance.startStream(
       inputDeviceId: _inputDeviceId,
@@ -112,19 +117,33 @@ class IcecastStreamer {
     );
   }
 
-  /// Get all input devices
+  /// Stop stream to ICECAST
   ///
-  /// Returns List of [InputDevice]
   Future<String?> stopStream() async {
     return await IcecastStreamerPlatform.instance.stopStream();
   }
 
+  /// Get all connected [InputDevice]
   static Future<List<InputDevice>> getInputDevices() async {
     var responce = await IcecastStreamerPlatform.instance.getInputDevices();
 
     return responce.map(InputDevice.fromMap).toList();
   }
 
+  /// Update streaming volume
   Future<void> updateVolume(double value) =>
       IcecastStreamerPlatform.instance.updateVolume(value);
+
+  /// Start recording
+  Future<void> startRecording() =>
+      IcecastStreamerPlatform.instance.startRecording();
+
+  /// Stop recording
+  ///
+  /// @returns path to recording
+  Future<String?> stopRecording() =>
+      IcecastStreamerPlatform.instance.stopRecording();
+
+  /// Close and fress all resources
+  Future<void> dispose() => IcecastStreamerPlatform.instance.dispose();
 }
