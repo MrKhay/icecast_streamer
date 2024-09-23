@@ -1,46 +1,49 @@
+// ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'package:flutter/services.dart';
+
 import 'package:icecast_streamer/model/input_device.dart';
+
 import 'icecast_streamer_platform_interface.dart';
 
 class IcecastStreamer {
   /// Input device id
-  final String? _inputDeviceId;
+  final String? inputDeviceId;
 
   /// Stream volume Range [0.0-1.0]
-  final double _volume;
+  final double volume;
 
   /// Streaming sampleRate `default is 44100 Hz`
-  final int _sampleRate;
+  final int sampleRate;
 
   /// PCM-16 Chunk Channel (Mono = 1 and Stero = 2) `default is Stero`
-  final int _numChannels;
+  final int numChannels;
 
   /// Streaming bitrate `default is 128 kbps`
-  final int _bitrate;
+  final int bitrate;
 
   /// Icecast Server address
-  final String _serverAddress;
+  final String serverAddress;
 
   /// Icecast username
-  final String _userName;
+  final String userName;
 
   /// Icecast port
-  final int _port;
+  final int port;
 
   /// Icecast mount
-  final String _mount;
+  final String mount;
 
   /// Icecast password
-  final String _password;
+  final String password;
 
   /// Error Callback when adding PCM-16 chunk to upload stream
-  final void Function(String error)? _onError;
+  final void Function(String error)? onError;
 
   /// Call back for when amplitude changes
-  final void Function(double value)? _onLoudnessChange;
+  final void Function(double value)? onLoudnessChange;
 
   ///  Callback for when streaming ends with no error
-  final void Function()? _onComplete;
+  final void Function()? onComplete;
 
   static const MethodChannel _channel = MethodChannel('icecast_streamer');
 
@@ -48,14 +51,14 @@ class IcecastStreamer {
     switch (call.method) {
       case "onError":
         String error = call.arguments['error'];
-        _onError?.call(error);
+        onError?.call(error);
         break;
       case "onComplete":
-        _onComplete?.call();
+        onComplete?.call();
         break;
       case "onLoudnessChange":
         double value = call.arguments['value'];
-        _onLoudnessChange?.call(value);
+        onLoudnessChange?.call(value);
         break;
       default:
         throw MissingPluginException(
@@ -65,32 +68,20 @@ class IcecastStreamer {
 
   /// IcecastFlutter Constructor
   IcecastStreamer({
-    String? inputDeivceId,
-    int bitrate = 128,
-    int numChannels = 2,
-    int sampleRate = 44100,
-    void Function(String)? onError,
-    void Function(double)? onLoudnessChange,
-    void Function()? onComplete,
-    required double volume,
-    required String serverAddress,
-    required int port,
-    required String password,
-    required String userName,
-    required String mount,
-  })  : _onComplete = onComplete,
-        _onError = onError,
-        _volume = volume,
-        _password = password,
-        _inputDeviceId = inputDeivceId,
-        _onLoudnessChange = onLoudnessChange,
-        _mount = mount,
-        _port = port,
-        _userName = userName,
-        _serverAddress = serverAddress,
-        _bitrate = bitrate,
-        _numChannels = numChannels,
-        _sampleRate = sampleRate {
+    this.inputDeviceId,
+    this.bitrate = 128,
+    this.numChannels = 2,
+    this.sampleRate = 44100,
+    required this.onError,
+    required this.onLoudnessChange,
+    required this.onComplete,
+    required this.volume,
+    required this.serverAddress,
+    required this.port,
+    required this.password,
+    required this.userName,
+    required this.mount,
+  }) {
     _channel.setMethodCallHandler(_handleNativeMethodCall);
   }
 
@@ -104,16 +95,16 @@ class IcecastStreamer {
   ///
   Future<void> startStream() async {
     await IcecastStreamerPlatform.instance.startStream(
-      inputDeviceId: _inputDeviceId,
-      volume: _volume,
-      bitrate: _bitrate,
-      sampleRate: _sampleRate,
-      numChannels: _numChannels,
-      userName: _userName,
-      port: _port,
-      password: _password,
-      mount: _mount,
-      serverAddress: _serverAddress,
+      inputDeviceId: inputDeviceId,
+      volume: volume,
+      bitrate: bitrate,
+      sampleRate: sampleRate,
+      numChannels: numChannels,
+      userName: userName,
+      port: port,
+      password: password,
+      mount: mount,
+      serverAddress: serverAddress,
     );
   }
 
@@ -146,4 +137,36 @@ class IcecastStreamer {
 
   /// Close and fress all resources
   Future<void> dispose() => IcecastStreamerPlatform.instance.dispose();
+
+  IcecastStreamer updateParameters({
+    String? inputDeviceId,
+    double? volume,
+    int? sampleRate,
+    int? numChannels,
+    int? bitrate,
+    String? serverAddress,
+    String? userName,
+    int? port,
+    String? mount,
+    String? password,
+    void Function(String error)? onError,
+    void Function(double value)? onLoudnessChange,
+    void Function()? onComplete,
+  }) {
+    return IcecastStreamer(
+      inputDeviceId: inputDeviceId ?? this.inputDeviceId,
+      volume: volume ?? this.volume,
+      sampleRate: sampleRate ?? this.sampleRate,
+      numChannels: numChannels ?? this.numChannels,
+      bitrate: bitrate ?? this.bitrate,
+      serverAddress: serverAddress ?? this.serverAddress,
+      userName: userName ?? this.userName,
+      port: port ?? this.port,
+      mount: mount ?? this.mount,
+      password: password ?? this.password,
+      onError: onError ?? this.onError,
+      onLoudnessChange: onLoudnessChange ?? this.onLoudnessChange,
+      onComplete: onComplete ?? this.onComplete,
+    );
+  }
 }
