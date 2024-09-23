@@ -27,7 +27,6 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     _icecastStreamerPlugin = IcecastStreamer(
-      inputDeivceId: "18",
       password: password,
       userName: username,
       volume: volume,
