@@ -7,34 +7,34 @@ import 'icecast_streamer_platform_interface.dart';
 
 class IcecastStreamer {
   /// Input device id
-  final String? inputDeviceId;
+  String? inputDeviceId;
 
   /// Stream volume Range [0.0-1.0]
-  final double volume;
+  double volume;
 
   /// Streaming sampleRate `default is 44100 Hz`
-  final int sampleRate;
+  int sampleRate;
 
   /// PCM-16 Chunk Channel (Mono = 1 and Stero = 2) `default is Stero`
-  final int numChannels;
+  int numChannels;
 
   /// Streaming bitrate `default is 128 kbps`
-  final int bitrate;
+  int bitrate;
 
   /// Icecast Server address
-  final String serverAddress;
+  String serverAddress;
 
   /// Icecast username
-  final String userName;
+  String userName;
 
   /// Icecast port
-  final int port;
+  int port;
 
   /// Icecast mount
-  final String mount;
+  String mount;
 
   /// Icecast password
-  final String password;
+  String password;
 
   /// Error Callback when adding PCM-16 chunk to upload stream
   final void Function(String error)? onError;
@@ -138,7 +138,8 @@ class IcecastStreamer {
   /// Close and fress all resources
   Future<void> dispose() => IcecastStreamerPlatform.instance.dispose();
 
-  IcecastStreamer updateParameters({
+  /// Update parameters
+  void updateParameters({
     String? inputDeviceId,
     double? volume,
     int? sampleRate,
@@ -149,24 +150,16 @@ class IcecastStreamer {
     int? port,
     String? mount,
     String? password,
-    void Function(String error)? onError,
-    void Function(double value)? onLoudnessChange,
-    void Function()? onComplete,
   }) {
-    return IcecastStreamer(
-      inputDeviceId: inputDeviceId ?? this.inputDeviceId,
-      volume: volume ?? this.volume,
-      sampleRate: sampleRate ?? this.sampleRate,
-      numChannels: numChannels ?? this.numChannels,
-      bitrate: bitrate ?? this.bitrate,
-      serverAddress: serverAddress ?? this.serverAddress,
-      userName: userName ?? this.userName,
-      port: port ?? this.port,
-      mount: mount ?? this.mount,
-      password: password ?? this.password,
-      onError: onError ?? this.onError,
-      onLoudnessChange: onLoudnessChange ?? this.onLoudnessChange,
-      onComplete: onComplete ?? this.onComplete,
-    );
+    this.inputDeviceId = inputDeviceId ?? this.inputDeviceId;
+    this.volume = volume ?? this.volume;
+    this.sampleRate = sampleRate ?? this.sampleRate;
+    this.numChannels = numChannels ?? this.numChannels;
+    this.bitrate = bitrate ?? this.bitrate;
+    this.serverAddress = serverAddress ?? this.serverAddress;
+    this.userName = userName ?? this.userName;
+    this.port = port ?? this.port;
+    this.mount = mount ?? this.mount;
+    this.password = password ?? this.password;
   }
 }
