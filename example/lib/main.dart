@@ -27,15 +27,6 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     _icecastStreamerPlugin = IcecastStreamer(
-      password: password,
-      userName: username,
-      volume: volume,
-      serverAddress: serverAddress,
-      mount: mount,
-      port: serverPort,
-      bitrate: bitRate,
-      sampleRate: sampleRate,
-      numChannels: numChannels,
       onLoudnessChange: (loudness) {
         // debugPrint("Loudness: $loudness");
         setState(() {
@@ -72,7 +63,17 @@ class _MyAppState extends State<MyApp> {
               FilledButton.tonal(
                 onPressed: () async {
                   if (!isStreaming) {
-                    await _icecastStreamerPlugin.startStream();
+                    await _icecastStreamerPlugin.startStream(
+                      password: password,
+                      userName: username,
+                      volume: volume,
+                      serverAddress: serverAddress,
+                      mount: mount,
+                      port: serverPort,
+                      bitrate: bitRate,
+                      sampleRate: sampleRate,
+                      numChannels: numChannels,
+                    );
 
                     setState(() {
                       isStreaming = true;
