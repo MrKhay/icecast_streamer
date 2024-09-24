@@ -6,36 +6,6 @@ import 'package:icecast_streamer/model/input_device.dart';
 import 'icecast_streamer_platform_interface.dart';
 
 class IcecastStreamer {
-  /// Input device id
-  String? inputDeviceId;
-
-  /// Stream volume Range [0.0-1.0]
-  double volume;
-
-  /// Streaming sampleRate `default is 44100 Hz`
-  int sampleRate;
-
-  /// PCM-16 Chunk Channel (Mono = 1 and Stero = 2) `default is Stero`
-  int numChannels;
-
-  /// Streaming bitrate `default is 128 kbps`
-  int bitrate;
-
-  /// Icecast Server address
-  String serverAddress;
-
-  /// Icecast username
-  String userName;
-
-  /// Icecast port
-  int port;
-
-  /// Icecast mount
-  String mount;
-
-  /// Icecast password
-  String password;
-
   /// Error Callback when adding PCM-16 chunk to upload stream
   final void Function(String error)? onError;
 
@@ -67,21 +37,7 @@ class IcecastStreamer {
   }
 
   /// IcecastFlutter Constructor
-  IcecastStreamer({
-    this.inputDeviceId,
-    this.bitrate = 128,
-    this.numChannels = 2,
-    this.sampleRate = 44100,
-    required this.onError,
-    required this.onLoudnessChange,
-    required this.onComplete,
-    required this.volume,
-    required this.serverAddress,
-    required this.port,
-    required this.password,
-    required this.userName,
-    required this.mount,
-  }) {
+  IcecastStreamer({this.onComplete, this.onError, this.onLoudnessChange}) {
     _channel.setMethodCallHandler(_handleNativeMethodCall);
   }
 
@@ -93,7 +49,37 @@ class IcecastStreamer {
 
   /// Starts new Stream
   ///
-  Future<void> startStream() async {
+  Future<void> startStream({
+    /// Input device id
+    String? inputDeviceId,
+
+    /// Stream volume Range [0.0-1.0]
+    required double volume,
+
+    /// Streaming sampleRate `default is 44100 Hz`
+    int sampleRate = 44100,
+
+    /// PCM-16 Chunk Channel (Mono = 1 and Stero = 2) `default is Stero`
+    int numChannels = 2,
+
+    /// Streaming bitrate `default is 128 kbps`
+    required int bitrate,
+
+    /// Icecast Server address
+    required String serverAddress,
+
+    /// Icecast username
+    required String userName,
+
+    /// Icecast port
+    required int port,
+
+    /// Icecast mount
+    required String mount,
+
+    /// Icecast password
+    required String password,
+  }) async {
     await IcecastStreamerPlatform.instance.startStream(
       inputDeviceId: inputDeviceId,
       volume: volume,
@@ -137,29 +123,4 @@ class IcecastStreamer {
 
   /// Close and fress all resources
   Future<void> dispose() => IcecastStreamerPlatform.instance.dispose();
-
-  /// Update parameters
-  void updateParameters({
-    String? inputDeviceId,
-    double? volume,
-    int? sampleRate,
-    int? numChannels,
-    int? bitrate,
-    String? serverAddress,
-    String? userName,
-    int? port,
-    String? mount,
-    String? password,
-  }) {
-    this.inputDeviceId = inputDeviceId ?? this.inputDeviceId;
-    this.volume = volume ?? this.volume;
-    this.sampleRate = sampleRate ?? this.sampleRate;
-    this.numChannels = numChannels ?? this.numChannels;
-    this.bitrate = bitrate ?? this.bitrate;
-    this.serverAddress = serverAddress ?? this.serverAddress;
-    this.userName = userName ?? this.userName;
-    this.port = port ?? this.port;
-    this.mount = mount ?? this.mount;
-    this.password = password ?? this.password;
-  }
 }
