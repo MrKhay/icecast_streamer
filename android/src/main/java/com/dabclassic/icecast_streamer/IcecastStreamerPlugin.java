@@ -217,7 +217,6 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
             init();
         }
 
-
         // stop recording if already recording
         if (recorder != null) {
             stopRecording();
@@ -240,11 +239,9 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
                         .setBufferSizeInBytes(BUFFER_SIZE)
                         .build();
 
-
                 if (deviceInfo != null) {
                     recorder.setPreferredDevice(deviceInfo);
                 }
-
 
                 if (recorder.getState() != AudioRecord.STATE_INITIALIZED) {
                     activity.runOnUiThread(() -> logError("Audio Record can't be initialized!"));
@@ -253,9 +250,16 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
                 }
 
                 recorder.startRecording();
+
                 // Initialize Pipe 1
                 if (isStreaming) {
                     fos1 = new FileOutputStream(pipePath1, true);
+                }
+
+                // Open FileOutputStream once for recording
+                FileOutputStream recordingFos = null;
+                if (isRecordingAudio) {
+                    recordingFos = new FileOutputStream(recordingChunkPath, true);
                 }
 
                 byte[] buffer = new byte[BUFFER_SIZE];
@@ -270,13 +274,8 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
                             fos1.write(modifiedBuffer, 0, read);
                         }
 
-                        if (isRecordingAudio) {
-                            // Write byte array to the file
-                            try (FileOutputStream fos = new FileOutputStream(recordingChunkPath)) {
-                                fos.write(modifiedBuffer);
-                            } catch (IOException e) {
-                                Log.e(TAG, e.getMessage());
-                            }
+                        if (isRecordingAudio && recordingFos != null) {
+                            recordingFos.write(modifiedBuffer, 0, read);
                         }
 
                         // Calculate RMS
@@ -286,10 +285,17 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
                         double dBValue = Loudness.calculateVuMeter(rmsValue);
 
                         activity.runOnUiThread(() -> updateLoudness(dBValue));
-
-
                     }
                 }
+
+                // Close file streams after recording ends
+                if (isStreaming && fos1 != null) {
+                    fos1.close();
+                }
+                if (isRecordingAudio && recordingFos != null) {
+                    recordingFos.close();
+                }
+
             } catch (Exception e) {
                 Log.e(TAG, "Start recorder", e);
             }
@@ -298,6 +304,7 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
         isRecording = true;
         recorderThread.start();
     }
+
 
     private void stopRecording() {
         isRecording = false;
@@ -378,6 +385,7 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
         Utility.createFile(recordedAudioPath);
 
         String[] command = {
+                "-y",                         // Add this flag to allow overwriting
                 "-f", "s16le",           // PCM format (16-bit little-endian)
                 "-ar", String.valueOf(SAMPLE_RATE),          // Sample rate (44.1kHz)
                 "-ac", String.valueOf(NUM_CHANNELS),              // Number of channels (2 for stereo)
