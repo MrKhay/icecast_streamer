@@ -258,14 +258,20 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
 
                 // Open FileOutputStream once for recording
                 FileOutputStream recordingFos = null;
-                if (isRecordingAudio) {
-                    recordingFos = new FileOutputStream(recordingChunkPath, true);
-                }
+
 
                 byte[] buffer = new byte[BUFFER_SIZE];
                 while (isRecording) {
                     int read = recorder.read(buffer, 0, buffer.length);
                     if (read > 0) {
+
+                        if (isRecordingAudio) {
+                            //initialize FileOutputStream
+                            if (recordingFos == null) {
+                                recordingFos = new FileOutputStream(recordingChunkPath, true);
+                            }
+
+                        }
 
                         // Scale the volume
                         byte[] modifiedBuffer = Loudness.ScaleVolume(buffer, VOLUME); // 'volume' is a float between 0.0 and 1.0
@@ -274,8 +280,11 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
                             fos1.write(modifiedBuffer, 0, read);
                         }
 
-                        if (isRecordingAudio && recordingFos != null) {
-                            recordingFos.write(modifiedBuffer, 0, read);
+                        if (isRecordingAudio) {
+                            if (recordingFos != null) {
+                                recordingFos.write(modifiedBuffer, 0, read);
+                            }
+
                         }
 
                         // Calculate RMS
@@ -283,6 +292,7 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
 
                         // Calculate dB value for VU meter
                         double dBValue = Loudness.calculateVuMeter(rmsValue);
+
 
                         activity.runOnUiThread(() -> updateLoudness(dBValue));
                     }
