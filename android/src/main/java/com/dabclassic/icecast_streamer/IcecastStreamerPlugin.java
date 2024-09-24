@@ -370,6 +370,7 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
             }
             Utility.DeletePipe(pipePath1);
             Utility.DeletePipe(pipePath2);
+            new File(recordingChunkPath).delete();
             pipePath1 = null;
             pipePath2 = null;
             recordingChunkPath = null;
