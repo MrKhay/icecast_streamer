@@ -219,7 +219,7 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
 
         // stop recording if already recording
         if (recorder != null) {
-            stopRecording();
+            recorder.stop();
         }
 
         // Initialize and start Recorder
@@ -317,7 +317,6 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
 
 
     private void stopRecording() {
-        isRecording = false;
 
         if (recorder != null) {
             recorder.stop();
