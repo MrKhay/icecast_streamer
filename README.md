@@ -7,4 +7,5 @@ A Flutter plugin for streaming audio to an Icecast server. This plugin allows us
 - Stream audio to an Icecast server.
 - List all connected audio device.
 - Adjust stream volume in real-time.
+- Stream recording.
 - Start/stop streaming with customizable settings like bitrate, channels, sample rate, etc.
