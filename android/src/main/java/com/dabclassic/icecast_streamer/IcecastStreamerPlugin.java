@@ -65,7 +65,6 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
     private boolean isStreaming = false;
     private boolean isRecording = false;
     private boolean isRecordingAudio = false; // PCM chunks are been recorded
-    private boolean isInitialized = false;
     private boolean isStreamTwoActive = false;
 
 
@@ -96,6 +95,8 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
                 ICECAST_PASSWORD = call.argument("password");
                 ICECAST_PORT = call.argument("port");
                 ICECAST_SERVER_ADDRESS = call.argument("serverAddress");
+                stopRecording(); // start recording
+                closeAndDeletePipe(); // close pipes
                 startRecording(); // start recording
                 startStreaming(); // start streaming
                 result.success(null);
@@ -119,12 +120,10 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
 
             case "startRecording":
                 startPCMRecording();
-                isRecordingAudio = true;
                 result.success(null);
                 break;
             case "stopRecording":
                 String recordingPath = stopAndSavePCMRecording();
-                isRecordingAudio = false;
                 result.success(recordingPath);
                 break;
             default:
@@ -155,14 +154,12 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
             // Get the app's private storage directory and create a named pipe
             pipePath1 = new File(getFilesDir(context), "audio_pipe_one").getAbsolutePath();
             pipePath2 = new File(getFilesDir(context), "audio_pipe_two").getAbsolutePath();
-            recordingChunkPath = new File(getFilesDir(context), "recording_chunk.pcm").getAbsolutePath();
             Utility.createNamedPipe(pipePath1);
             Utility.createNamedPipe(pipePath2);
 
 
 //            fos2 = new FileOutputStream(pipePath2);
 
-            isInitialized = true;
 
         } catch (Exception e) {
             Log.e(TAG, "Failed to init pipes", e);
@@ -213,14 +210,8 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
     private void startRecording() {
 
         // initialize
-        if (!isInitialized) {
-            init();
-        }
+        init();
 
-        // stop recording if already recording
-        if (recorder != null) {
-            recorder.stop();
-        }
 
         // Initialize and start Recorder
         recorderThread = new Thread(() -> {
@@ -369,22 +360,19 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
             }
             Utility.DeletePipe(pipePath1);
             Utility.DeletePipe(pipePath2);
-            new File(recordingChunkPath).delete();
             pipePath1 = null;
             pipePath2 = null;
-            recordingChunkPath = null;
             isRecording = false;
-            isInitialized = false;
         } catch (IOException e) {
             Log.e(TAG, "closeAndDeletePipe: " + e.getMessage());
         }
     }
 
     private void startPCMRecording() {
-        if (!isInitialized) {
-            init();
-        }
+        recordingChunkPath = new File(getFilesDir(context), "recording_chunk.pcm").getAbsolutePath();
         Utility.createFile(recordingChunkPath);
+
+        isRecordingAudio = true;
     }
 
     private String stopAndSavePCMRecording() {
@@ -409,10 +397,9 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
 
         // delete chunk
         new File(recordingChunkPath).delete();
-
+        recordingChunkPath = null;
+        isRecordingAudio = false;
         return recordedAudioPath;
-
-
     }
 
     void logError(String msg) {
