@@ -16,6 +16,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
 import com.arthenica.mobileffmpeg.FFmpeg;
+import com.dabclassic.icecast_streamer.executor.UploadFileToServer;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -56,10 +57,11 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
     private FileOutputStream recordingFOS;
     private Thread streamingThread;
     private Thread recorderThread;
-
+    private Thread uploadToServerThread;
     private String pipePath1;
     private String pipePath2;
     private String recordingChunkPath;
+    private FfmpegProcessListener sendFileToServerCompletionListener;
 
     private AudioRecord recorder;
     private boolean isStreaming = false;
@@ -125,6 +127,45 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
             case "stopRecording":
                 String recordingPath = stopAndSavePCMRecording();
                 result.success(recordingPath);
+                break;
+            case "uploadFileToServer":
+                String path = call.argument("path");
+                int bitrate = call.argument("bitrate");
+                String userName = call.argument("userName");
+                int port = call.argument("port");
+                String password = call.argument("password");
+                String mount = call.argument("mount");
+                String serverAddress = call.argument("serverAddress");
+
+                // stream file content to icecast
+                FfmpegProcessListener listener = new FfmpegProcessListener() {
+                    @Override
+                    public void onThreadComplete(boolean successful) {
+                        Map<String, String> info = new HashMap<>();
+                        info.put("successful", String.valueOf(successful));
+                        channel.invokeMethod("onFileStreamingComplete", info);
+                    }
+
+                    @Override
+                    public void onProgress(int time, double speed, double bitrate, double size) {
+                        // Create a map to hold error information
+                        Map<String, String> info = new HashMap<>();
+                        info.put("time", String.valueOf(time));  // Key should match what Dart expects
+                        info.put("speed", String.valueOf(speed));  // Key should match what Dart expects
+                        info.put("bitrate", String.valueOf(bitrate));  // Key should match what Dart expects
+                        info.put("size", String.valueOf(size));  // Key should match what Dart expects
+                        channel.invokeMethod("onStreamingProgress", info);
+                    }
+                };
+
+                // upload
+                uploadFileToIcecast(listener, path, bitrate, userName, port, password, mount, serverAddress);
+                result.success(null);
+                break;
+
+            case "cancelUploadToServer":
+                stopFileUploadToIcecast();
+                result.success(null);
                 break;
             default:
                 result.notImplemented();
@@ -369,6 +410,8 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
     }
 
     private void startPCMRecording() {
+
+
         recordingChunkPath = new File(getFilesDir(context), "recording_chunk.pcm").getAbsolutePath();
         Utility.createFile(recordingChunkPath);
 
@@ -395,11 +438,31 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
 
         int returnCode = FFmpeg.execute(command);
 
+
         // delete chunk
         new File(recordingChunkPath).delete();
         recordingChunkPath = null;
         isRecordingAudio = false;
         return recordedAudioPath;
+    }
+
+
+    private void uploadFileToIcecast(FfmpegProcessListener listener, String path, int bitrate, String userName, int port, String password, String mount, String serverAddress) {
+        uploadToServerThread = new Thread(new UploadFileToServer(listener, activity, path, bitrate, userName, port, password, mount, serverAddress));
+        uploadToServerThread.start();
+
+    }
+
+    // pin - 45679 4523
+    private void stopFileUploadToIcecast() {
+
+
+        if (uploadToServerThread != null) {
+            uploadToServerThread.interrupt();
+            uploadToServerThread = null;
+        }
+
+        FFmpeg.cancel();
     }
 
     void logError(String msg) {
