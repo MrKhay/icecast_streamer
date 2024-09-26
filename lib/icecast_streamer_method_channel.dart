@@ -99,4 +99,33 @@ class MethodChannelIcecastStreamer extends IcecastStreamerPlatform {
         await methodChannel.invokeMethod<String?>('stopRecording');
     return recordingPath;
   }
+
+  @override
+  Future<void> uploadFileToServer({
+    required String path,
+    required int bitrate,
+    required String userName,
+    required int port,
+    required String password,
+    required String mount,
+    required String serverAddress,
+  }) async {
+    await methodChannel.invokeMethod('uploadFileToServer', {
+      "path": path,
+      "bitrate": bitrate,
+      "userName": userName,
+      "port": port,
+      "password": password,
+      "mount": mount,
+      "serverAddress": serverAddress
+    });
+
+    return;
+  }
+
+  @override
+  Future<void> cancelUploadToServer() async {
+    await methodChannel.invokeMethod<String?>('cancelUploadToServer');
+    return;
+  }
 }

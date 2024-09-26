@@ -12,6 +12,13 @@ class IcecastStreamer {
   /// Call back for when amplitude changes
   final void Function(double value)? onLoudnessChange;
 
+  /// Call back for when file streaming ends
+  void Function(bool successful)? onFileStreamingComplete;
+
+  /// Call back for streaming progress
+  void Function(int time, double speed, double bitrate, double size)?
+      onProgress;
+
   ///  Callback for when streaming ends with no error
   final void Function()? onComplete;
 
@@ -29,6 +36,17 @@ class IcecastStreamer {
       case "onLoudnessChange":
         double value = call.arguments['value'];
         onLoudnessChange?.call(value);
+        break;
+      case "onFileStreamingComplete":
+        bool successful = bool.tryParse(call.arguments['successful']) ?? false;
+        onFileStreamingComplete?.call(successful);
+        break;
+      case "onStreamingProgress":
+        double speed = double.tryParse(call.arguments['speed']) ?? 0.0;
+        int time = int.tryParse(call.arguments['time']) ?? 0;
+        double bitrate = double.tryParse(call.arguments['bitrate']) ?? 0.0;
+        double size = double.tryParse(call.arguments['size']) ?? 0.0;
+        onProgress?.call(time, speed, bitrate, size);
         break;
       default:
         throw MissingPluginException(
@@ -106,6 +124,55 @@ class IcecastStreamer {
 
     return responce.map(InputDevice.fromMap).toList();
   }
+
+  /// Uplaod file to icecast
+  /// returns true when no error
+  Future<void> uplaodFileToServer({
+    /// Callback for streaming stats
+    void Function(int time, double speed, double bitrate, double size)?
+        onProgress,
+
+    /// Callback for when streaming ends
+    void Function(bool successful)? onFileStreamingComplete,
+
+    ///  Path to file to be uploaded
+    required String path,
+
+    /// Streaming bitrate `default is 128 kbps`
+    required int bitrate,
+
+    /// Icecast Server address
+    required String serverAddress,
+
+    /// Icecast username
+    required String userName,
+
+    /// Icecast port
+    required int port,
+
+    /// Icecast mount
+    required String mount,
+
+    /// Icecast password
+    required String password,
+  }) async {
+    // init progress listener
+    this.onProgress = onProgress;
+    this.onFileStreamingComplete = onFileStreamingComplete;
+    return IcecastStreamerPlatform.instance.uploadFileToServer(
+      path: path,
+      bitrate: bitrate,
+      serverAddress: serverAddress,
+      userName: userName,
+      port: port,
+      mount: mount,
+      password: password,
+    );
+  }
+
+  /// Stop upload to server
+  static Future<void> cancelUploadToServer() =>
+      IcecastStreamerPlatform.instance.cancelUploadToServer();
 
   /// Update streaming volume
   Future<void> updateVolume(double value) =>
