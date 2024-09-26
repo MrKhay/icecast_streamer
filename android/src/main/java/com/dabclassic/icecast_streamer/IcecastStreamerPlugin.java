@@ -143,6 +143,8 @@ public class IcecastStreamerPlugin implements FlutterPlugin, MethodCallHandler, 
                     public void onThreadComplete(boolean successful) {
                         Map<String, String> info = new HashMap<>();
                         info.put("successful", String.valueOf(successful));
+                        Log.i(TAG,"EXIST: ✅ ✅✅✅ ");
+
                         channel.invokeMethod("onFileStreamingComplete", info);
                     }
 

@@ -1,6 +1,7 @@
 package com.dabclassic.icecast_streamer.executor;
 
 import android.app.Activity;
+import android.util.Log;
 
 import com.arthenica.mobileffmpeg.FFmpeg;
 import com.dabclassic.icecast_streamer.FfmpegProcessListener;
@@ -9,6 +10,7 @@ import com.arthenica.mobileffmpeg.Config;
 
 public class UploadFileToServer implements Runnable {
     private final FfmpegProcessListener listener;
+    private final String TAG = "FFmpeg";
     private final String path;
     private final int bitrate;
     private final String userName;
@@ -47,7 +49,7 @@ public class UploadFileToServer implements Runnable {
             @Override
             public void apply(long executionId, int returnCode) {
                 // This is executed when FFmpeg execution finishes
-                System.out.println("FFmpeg finished with return code: " + returnCode);
+                Log.i(TAG,"FFmpeg finished with return code: " + returnCode);
 
                 // Notify listener when thread finishes
                 if (listener != null) {
