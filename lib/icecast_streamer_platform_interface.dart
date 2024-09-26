@@ -62,6 +62,22 @@ abstract class IcecastStreamerPlatform extends PlatformInterface {
     throw UnimplementedError('platformVersion() has not been implemented.');
   }
 
+  Future<void> cancelUploadToServer() {
+    throw UnimplementedError('platformVersion() has not been implemented.');
+  }
+
+  Future<void> uploadFileToServer({
+    required String path,
+    required int bitrate,
+    required String userName,
+    required int port,
+    required String password,
+    required String mount,
+    required String serverAddress,
+  }) {
+    throw UnimplementedError('platformVersion() has not been implemented.');
+  }
+
   Future<void> updateVolume(double value) {
     throw UnimplementedError('platformVersion() has not been implemented.');
   }

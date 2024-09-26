@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:icecast_streamer/icecast_streamer.dart';
 
@@ -21,6 +24,7 @@ class _MyAppState extends State<MyApp> {
   final int numChannels = 2;
   bool isStreaming = false;
   bool isRecording = false;
+  bool isUploading = false;
   double loudness = -50;
   double volume = 1.0;
 
@@ -115,6 +119,59 @@ class _MyAppState extends State<MyApp> {
                 ),
               ),
               const SizedBox(height: 30),
+              FilledButton.tonal(
+                onPressed: () async {
+                  if (isUploading) {
+                    await IcecastStreamer.cancelUploadToServer();
+                    return;
+                  }
+                  FilePickerResult? result =
+                      await FilePicker.platform.pickFiles(type: FileType.audio);
+
+                  if (result != null) {
+                    File file = File(result.files.single.path!);
+                    setState(() {
+                      isUploading = true;
+                    });
+
+                    await _icecastStreamerPlugin.uplaodFileToServer(
+                      path: file.path,
+                      bitrate: bitRate,
+                      serverAddress: serverAddress,
+                      userName: username,
+                      port: serverPort,
+                      mount: mount,
+                      password: password,
+                      onFileStreamingComplete: (successful) {
+                        setState(() {
+                          isUploading = false;
+                        });
+                      },
+                      onProgress: (time, speed, bitrate, size) {
+                        debugPrint(
+                            "Speed: $speed Time: $time Bitrate: $bitrate Size: $size");
+                      },
+                    );
+                  } else {
+                    // User canceled the picker
+                  }
+                },
+                child: isUploading
+                    ? const CircularProgressIndicator()
+                    : const Text(
+                        'Upload file',
+                      ),
+              ),
+              const SizedBox(height: 30),
+              const SizedBox(height: 30),
+              FilledButton.tonal(
+                onPressed: () async {
+                  await IcecastStreamer.cancelUploadToServer();
+                },
+                child: const Text(
+                  'Stop Upload file',
+                ),
+              ),
             ],
           ),
         ),
